@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>드래그 앤 드롭 이미지 배치</title>
+  <style>
+    :root {
+      --bg: #efefef;
+      --line: #111;
+      --panel: #ffffff;
+      --pill: #000000;
+      --text: #ffffff;
+      --ui: #ffffff;
+      --ui-line: #d8d8d8;
+      --accent: #111;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background: #dcdcdc;
+      color: #111;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .controls {
+      background: var(--ui);
+      border: 1px solid var(--ui-line);
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+      align-self: start;
+      position: sticky;
+      top: 20px;
+    }
+
+    .controls h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    .controls p {
+      margin: 0 0 16px;
+      line-height: 1.5;
+      color: #444;
+      font-size: 14px;
+    }
+
+    .group {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #ececec;
+    }
+
+    .group h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.45;
+    }
+
+    .status {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #f6f6f6;
+      font-size: 13px;
+      line-height: 1.4;
+      min-height: 42px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .row label {
+      width: 52px;
+      font-size: 13px;
+      color: #333;
+    }
+
+    input[type="range"] {
+      flex: 1;
+    }
+
+    .value {
+      width: 48px;
+      text-align: right;
+      font-size: 12px;
+      color: #555;
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    button {
+      border: 1px solid #cfcfcf;
+      background: #fff;
+      color: #111;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.15s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+
+    .primary {
+      background: #111;
+      color: #fff;
+      border-color: #111;
+    }
+
+    .stage-wrap {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow: auto;
+      padding: 10px;
+    }
+
+    .stage {
+      width: 1080px;
+      height: 608px;
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 18px 50px rgba(0,0,0,0.10);
+      user-select: none;
+    }
+
+    .pill {
+      position: absolute;
+      background: var(--pill);
+      color: var(--text);
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+      z-index: 3;
+      white-space: nowrap;
+    }
+
+    .pill.left  { left: 20px; top: 23px; width: 322px; height: 64px; font-size: 26px; }
+    .pill.right { right: 0px; top: 23px; width: 341px; height: 64px; font-size: 25px; }
+
+    .slot {
+      position: absolute;
+      background: #fff;
+      border: 3px solid var(--line);
+      border-radius: 28px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+
+    .slot.selected {
+      box-shadow: 0 0 0 4px rgba(17,17,17,0.15);
+    }
+
+    .slot.dragover {
+      box-shadow: inset 0 0 0 4px rgba(17,17,17,0.18);
+      background: #f9f9f9;
+    }
+
+    .slot.empty::before {
+      content: '이미지를 드래그하거나 클릭';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 12px;
+      color: #888;
+      font-size: 15px;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .slot img {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform-origin: center center;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      max-width: none;
+      max-height: none;
+    }
+
+    .slot input[type="file"] {
+      display: none;
+    }
+
+    .badge {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      z-index: 2;
+      font-size: 12px;
+      padding: 5px 8px;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(0,0,0,0.15);
+      border-radius: 999px;
+    }
+
+    .slot1 { left: 54px;  top: 144px; width: 248px; height: 350px; }
+    .slot2 { left: 365px; top: 115px; width: 197px; height: 211px; }
+    .slot3 { left: 592px; top: 115px; width: 199px; height: 211px; }
+    .slot4 { left: 821px; top: 115px; width: 202px; height: 211px; }
+    .slot5 { left: 365px; top: 346px; width: 197px; height: 209px; }
+    .slot6 { left: 592px; top: 346px; width: 199px; height: 209px; }
+    .slot7 { left: 821px; top: 346px; width: 202px; height: 209px; }
+
+    @media (max-width: 1280px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+      .controls {
+        position: static;
+      }
+      .stage-wrap {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="controls">
+      <h1>이미지 배치 툴</h1>
+      <p>각 칸에 이미지를 드래그 앤 드롭하면 바로 반영됩니다. 칸을 선택한 뒤 슬라이더나 방향키로 미세 조정할 수 있습니다.</p>
+
+      <div class="group">
+        <h2>현재 선택</h2>
+        <div id="status" class="status">선택된 칸이 없습니다.</div>
+      </div>
+
+      <div class="group">
+        <h2>미세 조정</h2>
+        <div class="row">
+          <label for="offsetX">좌우</label>
+          <input id="offsetX" type="range" min="-300" max="300" step="1" value="0" />
+          <div class="value" id="offsetXValue">0px</div>
+        </div>
+        <div class="row">
+          <label for="offsetY">상하</label>
+          <input id="offsetY" type="range" min="-300" max="300" step="1" value="0" />
+          <div class="value" id="offsetYValue">0px</div>
+        </div>
+        <div class="row">
+          <label for="zoom">확대</label>
+          <input id="zoom" type="range" min="50" max="250" step="1" value="100" />
+          <div class="value" id="zoomValue">100%</div>
+        </div>
+        <div class="btn-grid">
+          <button id="centerBtn">가운데 정렬</button>
+          <button id="resetBtn">해당 칸 초기화</button>
+          <button id="clearAllBtn">전체 비우기</button>
+          <button id="downloadBtn" class="primary">완성본 다운로드</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <h2>조작법</h2>
+        <div class="hint">
+          방향키: 1px 이동<br>
+          Shift + 방향키: 10px 이동<br>
+          클릭: 칸 선택 및 파일 열기<br>
+          드래그 앤 드롭: 탐색기 이미지 바로 넣기
+        </div>
+      </div>
+    </aside>
+
+    <main class="stage-wrap">
+      <div id="stage" class="stage" aria-label="배치 미리보기">
+        <div class="pill left">모험가커마 ▶</div>
+        <div class="pill right">◀ 캐릭터취향표</div>
+
+        <div class="slot slot1 empty" data-slot-id="1"><span class="badge">1</span><input type="file" accept="image/*" /></div>
+        <div class="slot slot2 empty" data-slot-id="2"><span class="badge">2</span><input type="file" accept="image/*" /></div>
+        <div class="slot slot3 empty" data-slot-id="3"><span class="badge">3</span><input type="file" accept="image/*" /></div>
+        <div class="slot slot4 empty" data-slot-id="4"><span class="badge">4</span><input type="file" accept="image/*" /></div>
+        <div class="slot slot5 empty" data-slot-id="5"><span class="badge">5</span><input type="file" accept="image/*" /></div>
+        <div class="slot slot6 empty" data-slot-id="6"><span class="badge">6</span><input type="file" accept="image/*" /></div>
+        <div class="slot slot7 empty" data-slot-id="7"><span class="badge">7</span><input type="file" accept="image/*" /></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const slots = [...document.querySelectorAll('.slot')];
+    const statusEl = document.getElementById('status');
+    const offsetX = document.getElementById('offsetX');
+    const offsetY = document.getElementById('offsetY');
+    const zoom = document.getElementById('zoom');
+    const offsetXValue = document.getElementById('offsetXValue');
+    const offsetYValue = document.getElementById('offsetYValue');
+    const zoomValue = document.getElementById('zoomValue');
+    const centerBtn = document.getElementById('centerBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const stage = document.getElementById('stage');
+
+    let selectedSlot = null;
+    const state = new Map();
+
+    slots.forEach((slot) => {
+      state.set(slot.dataset.slotId, {
+        src: null,
+        offsetX: 0,
+        offsetY: 0,
+        zoom: 100,
+        naturalWidth: 0,
+        naturalHeight: 0,
+      });
+
+      slot.addEventListener('click', (e) => {
+        selectSlot(slot);
+        if (e.target === slot || e.target.classList.contains('badge')) {
+          slot.querySelector('input[type="file"]').click();
+        }
+      });
+
+      const fileInput = slot.querySelector('input[type="file"]');
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (file) loadFileIntoSlot(file, slot);
+        fileInput.value = '';
+      });
+
+      slot.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        slot.classList.add('dragover');
+      });
+
+      slot.addEventListener('dragleave', () => {
+        slot.classList.remove('dragover');
+      });
+
+      slot.addEventListener('drop', (e) => {
+        e.preventDefault();
+        slot.classList.remove('dragover');
+        selectSlot(slot);
+        const file = [...(e.dataTransfer?.files || [])].find(f => f.type.startsWith('image/'));
+        if (file) loadFileIntoSlot(file, slot);
+      });
+    });
+
+    function selectSlot(slot) {
+      slots.forEach(s => s.classList.remove('selected'));
+      selectedSlot = slot;
+      slot.classList.add('selected');
+      syncControlsFromState();
+      updateStatus();
+    }
+
+    function updateStatus() {
+      if (!selectedSlot) {
+        statusEl.textContent = '선택된 칸이 없습니다.';
+        return;
+      }
+      const s = state.get(selectedSlot.dataset.slotId);
+      statusEl.innerHTML = `칸 ${selectedSlot.dataset.slotId} 선택됨<br>좌우 ${s.offsetX}px · 상하 ${s.offsetY}px · 확대 ${s.zoom}%`;
+    }
+
+    function syncControlsFromState() {
+      if (!selectedSlot) return;
+      const s = state.get(selectedSlot.dataset.slotId);
+      offsetX.value = s.offsetX;
+      offsetY.value = s.offsetY;
+      zoom.value = s.zoom;
+      offsetXValue.textContent = `${s.offsetX}px`;
+      offsetYValue.textContent = `${s.offsetY}px`;
+      zoomValue.textContent = `${s.zoom}%`;
+    }
+
+    function updateSelectedStateFromControls() {
+      if (!selectedSlot) return;
+      const s = state.get(selectedSlot.dataset.slotId);
+      s.offsetX = Number(offsetX.value);
+      s.offsetY = Number(offsetY.value);
+      s.zoom = Number(zoom.value);
+      offsetXValue.textContent = `${s.offsetX}px`;
+      offsetYValue.textContent = `${s.offsetY}px`;
+      zoomValue.textContent = `${s.zoom}%`;
+      renderSlot(selectedSlot);
+      updateStatus();
+    }
+
+    offsetX.addEventListener('input', updateSelectedStateFromControls);
+    offsetY.addEventListener('input', updateSelectedStateFromControls);
+    zoom.addEventListener('input', updateSelectedStateFromControls);
+
+    centerBtn.addEventListener('click', () => {
+      if (!selectedSlot) return;
+      const s = state.get(selectedSlot.dataset.slotId);
+      s.offsetX = 0;
+      s.offsetY = 0;
+      syncControlsFromState();
+      renderSlot(selectedSlot);
+      updateStatus();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      if (!selectedSlot) return;
+      const id = selectedSlot.dataset.slotId;
+      const prev = state.get(id);
+      state.set(id, {
+        ...prev,
+        src: null,
+        offsetX: 0,
+        offsetY: 0,
+        zoom: 100,
+        naturalWidth: 0,
+        naturalHeight: 0,
+      });
+      renderSlot(selectedSlot);
+      syncControlsFromState();
+      updateStatus();
+    });
+
+    clearAllBtn.addEventListener('click', () => {
+      slots.forEach(slot => {
+        const id = slot.dataset.slotId;
+        state.set(id, {
+          src: null,
+          offsetX: 0,
+          offsetY: 0,
+          zoom: 100,
+          naturalWidth: 0,
+          naturalHeight: 0,
+        });
+        renderSlot(slot);
+      });
+      updateStatus();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!selectedSlot) return;
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      const s = state.get(selectedSlot.dataset.slotId);
+      const step = e.shiftKey ? 10 : 1;
+      let moved = false;
+
+      if (e.key === 'ArrowLeft') { s.offsetX -= step; moved = true; }
+      if (e.key === 'ArrowRight') { s.offsetX += step; moved = true; }
+      if (e.key === 'ArrowUp') { s.offsetY -= step; moved = true; }
+      if (e.key === 'ArrowDown') { s.offsetY += step; moved = true; }
+
+      if (moved) {
+        e.preventDefault();
+        syncControlsFromState();
+        renderSlot(selectedSlot);
+        updateStatus();
+      }
+    });
+
+    function loadFileIntoSlot(file, slot) {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const s = state.get(slot.dataset.slotId);
+          s.src = reader.result;
+          s.offsetX = 0;
+          s.offsetY = 0;
+          s.zoom = 100;
+          s.naturalWidth = img.naturalWidth;
+          s.naturalHeight = img.naturalHeight;
+          renderSlot(slot);
+          if (selectedSlot === slot) {
+            syncControlsFromState();
+            updateStatus();
+          }
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function renderSlot(slot) {
+      const id = slot.dataset.slotId;
+      const s = state.get(id);
+      let img = slot.querySelector('img');
+
+      if (!s.src) {
+        if (img) img.remove();
+        slot.classList.add('empty');
+        return;
+      }
+
+      slot.classList.remove('empty');
+      if (!img) {
+        img = document.createElement('img');
+        slot.appendChild(img);
+      }
+      img.src = s.src;
+
+      const rect = slot.getBoundingClientRect();
+      const slotW = rect.width;
+      const slotH = rect.height;
+      const baseScale = Math.max(slotW / s.naturalWidth, slotH / s.naturalHeight);
+      const scale = baseScale * (s.zoom / 100);
+      const drawW = s.naturalWidth * scale;
+      const drawH = s.naturalHeight * scale;
+
+      img.style.width = `${drawW}px`;
+      img.style.height = `${drawH}px`;
+      img.style.transform = `translate(calc(-50% + ${s.offsetX}px), calc(-50% + ${s.offsetY}px))`;
+    }
+
+    async function downloadComposite() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 608;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#efefef';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      drawRoundedRect(ctx, 20, 23, 322, 64, 30, '#000');
+      drawRoundedRect(ctx, 739, 23, 341, 64, 30, '#000');
+
+      ctx.fillStyle = '#fff';
+      ctx.font = '700 26px "Malgun Gothic", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('모험가커마 ▶', 20 + 161, 23 + 32);
+      ctx.font = '700 25px "Malgun Gothic", sans-serif';
+      ctx.fillText('◀ 캐릭터취향표', 739 + 170.5, 23 + 32);
+
+      const slotDefs = [
+        { id: '1', x: 54,  y: 144, w: 248, h: 350 },
+        { id: '2', x: 365, y: 115, w: 197, h: 211 },
+        { id: '3', x: 592, y: 115, w: 199, h: 211 },
+        { id: '4', x: 821, y: 115, w: 202, h: 211 },
+        { id: '5', x: 365, y: 346, w: 197, h: 209 },
+        { id: '6', x: 592, y: 346, w: 199, h: 209 },
+        { id: '7', x: 821, y: 346, w: 202, h: 209 },
+      ];
+
+      for (const def of slotDefs) {
+        const s = state.get(def.id);
+
+        ctx.save();
+        roundedRectPath(ctx, def.x, def.y, def.w, def.h, 28);
+        ctx.clip();
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(def.x, def.y, def.w, def.h);
+
+        if (s?.src) {
+          const img = await loadImage(s.src);
+          const baseScale = Math.max(def.w / img.naturalWidth, def.h / img.naturalHeight);
+          const scale = baseScale * (s.zoom / 100);
+          const drawW = img.naturalWidth * scale;
+          const drawH = img.naturalHeight * scale;
+          const cx = def.x + def.w / 2 + s.offsetX;
+          const cy = def.y + def.h / 2 + s.offsetY;
+          ctx.drawImage(img, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
+        }
+        ctx.restore();
+
+        ctx.save();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#111';
+        roundedRectPath(ctx, def.x, def.y, def.w, def.h, 28);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      const link = document.createElement('a');
+      link.download = 'completed-layout.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    downloadBtn.addEventListener('click', downloadComposite);
+
+    function roundedRectPath(ctx, x, y, w, h, r) {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + w - radius, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+      ctx.lineTo(x + w, y + h - radius);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      ctx.lineTo(x + radius, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    function drawRoundedRect(ctx, x, y, w, h, r, fill) {
+      ctx.save();
+      ctx.fillStyle = fill;
+      roundedRectPath(ctx, x, y, w, h, r);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    selectSlot(slots[0]);
+  </script>
+</body>
+</html>
